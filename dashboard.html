@@ -1,0 +1,2498 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Weathrly</title>
+<meta name="description" content="Weathrly temperature intelligence dashboard." />
+
+<link rel="icon" type="image/png" href="weatherbot-logo.png" />
+<link rel="shortcut icon" type="image/png" href="weatherbot-logo.png" />
+<link rel="apple-touch-icon" href="weatherbot-logo.png" />
+
+  <style>
+    :root {
+      --bg:#041427;
+      --text:rgba(255,255,255,.96);
+      --muted:rgba(214,226,240,.68);
+      --faint:rgba(255,255,255,.38);
+      --cyan:#8fe8ff;
+      --cyan-2:#68cfff;
+      --lime:#b7ff5a;
+      --orange:#ffb11a;
+      --red:#ff6767;
+      --pay-color:#ffb11a;
+      --pay-soft:rgba(255,177,26,.18);
+      --ease:cubic-bezier(.16,1,.3,1);
+      --shadow:0 30px 110px rgba(0,0,0,.28);
+    }
+
+    * { box-sizing:border-box; }
+
+    html,
+    body {
+      margin:0;
+      width:100%;
+      min-height:100%;
+      background:var(--bg);
+      color:var(--text);
+      font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      -webkit-font-smoothing:antialiased;
+      text-rendering:geometricPrecision;
+    }
+
+    body {
+      overflow:hidden;
+      background:
+        radial-gradient(circle at 72% 14%, rgba(104,207,255,.08), transparent 30%),
+        radial-gradient(circle at 22% 20%, rgba(143,232,255,.045), transparent 22%),
+        linear-gradient(180deg, #071f39 0%, #08213b 42%, #061a31 100%);
+    }
+
+    a { color:inherit; text-decoration:none; }
+    button, input, select { font:inherit; }
+
+    .page {
+      position:relative;
+      width:100%;
+      min-height:100svh;
+      isolation:isolate;
+      overflow:hidden;
+    }
+
+    .ambient-grid {
+      position:fixed;
+      inset:0;
+      z-index:0;
+      pointer-events:none;
+      opacity:.15;
+      background-image:
+        linear-gradient(rgba(255,255,255,.65) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.65) 1px, transparent 1px);
+      background-size:52px 52px;
+      mask-image:linear-gradient(180deg, rgba(0,0,0,.95), rgba(0,0,0,.58) 72%, transparent);
+    }
+
+    .page-glow {
+      position:fixed;
+      inset:0;
+      z-index:0;
+      pointer-events:none;
+      background:
+        radial-gradient(circle at 50% 26%, rgba(104,207,255,.09), transparent 28%),
+        radial-gradient(circle at 82% 72%, rgba(90,177,255,.05), transparent 26%);
+      filter:blur(18px);
+    }
+
+    .cursor-light {
+      position:fixed;
+      z-index:300;
+      width:18rem;
+      height:18rem;
+      border-radius:999px;
+      pointer-events:none;
+      background:rgba(143,232,255,.07);
+      filter:blur(48px);
+      transform:translate(-50%, -50%);
+      opacity:0;
+      transition:opacity .25s ease;
+    }
+
+    .glass {
+      position:relative;
+      overflow:hidden;
+      border:1px solid rgba(255,255,255,.09);
+      background:
+        radial-gradient(circle at 50% 0%, rgba(143,232,255,.06), transparent 32%),
+        linear-gradient(180deg, rgba(6,26,49,.68), rgba(4,14,27,.92));
+      box-shadow:var(--shadow), inset 0 1px 0 rgba(255,255,255,.04);
+      backdrop-filter:blur(14px);
+    }
+
+    .glass::before {
+      content:"";
+      position:absolute;
+      inset:0;
+      pointer-events:none;
+      opacity:.05;
+      background-image:
+        linear-gradient(rgba(255,255,255,.8) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.8) 1px, transparent 1px);
+      background-size:34px 34px;
+    }
+
+    .glass > * {
+      position:relative;
+      z-index:2;
+    }
+
+    .access-view {
+      position:relative;
+      z-index:2;
+      width:100%;
+      min-height:100svh;
+      display:grid;
+      grid-template-rows:auto 1fr;
+    }
+
+    .nav {
+      position:relative;
+      z-index:10;
+      padding:18px 20px 0;
+    }
+
+    .nav-inner {
+      width:min(1120px, calc(100% - 8px));
+      margin:0 auto;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:16px;
+      padding:10px 14px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.10);
+      background:rgba(5,18,34,.30);
+      backdrop-filter:blur(14px);
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
+    }
+
+    .brand {
+      display:inline-flex;
+      align-items:center;
+      gap:12px;
+      min-width:max-content;
+    }
+
+    .brand-logo {
+      width:34px;
+      height:34px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      overflow:visible;
+    }
+
+    .brand-logo img {
+      width:34px;
+      height:34px;
+      object-fit:contain;
+      display:block;
+      filter:saturate(1.12) contrast(1.06) brightness(1.08) drop-shadow(0 0 10px rgba(104,207,255,.28));
+    }
+
+    .brand-text {
+      font-size:13px;
+      font-weight:760;
+      letter-spacing:.18em;
+      color:rgba(255,255,255,.9);
+      text-transform:uppercase;
+    }
+
+    .back-link,
+    .top-btn,
+    .logout-btn,
+    .copy-btn,
+    .pay-tab,
+    .access-btn,
+    .side-link,
+    .license-btn {
+      position:relative;
+      overflow:hidden;
+    }
+
+    .back-link {
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-height:38px;
+      padding:0 16px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.10);
+      background:rgba(255,255,255,.03);
+      color:rgba(255,255,255,.78);
+      font-size:11px;
+      font-weight:760;
+      letter-spacing:.18em;
+      text-transform:uppercase;
+      transition:.25s ease;
+      cursor:pointer;
+    }
+
+    .back-link:hover {
+      color:white;
+      border-color:rgba(143,232,255,.35);
+      background:rgba(255,255,255,.08);
+      transform:translateY(-1px);
+    }
+
+    .access-container {
+      position:relative;
+      z-index:2;
+      width:min(100%, calc(100% - 32px));
+      margin:0 auto;
+      min-height:calc(100svh - 68px);
+      display:grid;
+      place-items:center;
+      padding:28px 0;
+    }
+
+    .access-shell {
+      width:min(100%, 390px);
+      position:relative;
+      margin-inline:auto;
+    }
+
+    .access-shell::before {
+      content:"";
+      position:absolute;
+      inset:-52px -72px auto;
+      height:210px;
+      border-radius:999px;
+      background:radial-gradient(circle, rgba(104,207,255,.14), transparent 72%);
+      filter:blur(34px);
+      z-index:-1;
+      pointer-events:none;
+    }
+
+    .access-card {
+      position:relative;
+      overflow:hidden;
+      width:100%;
+      min-height:646px;
+      display:flex;
+      flex-direction:column;
+      padding:18px;
+      border-radius:28px;
+      border:1px solid rgba(143,232,255,.13);
+      background:
+        radial-gradient(circle at 50% 0%, rgba(143,232,255,.085), transparent 34%),
+        linear-gradient(180deg, rgba(6,26,49,.74), rgba(4,14,27,.94));
+      box-shadow:
+        0 30px 110px rgba(0,0,0,.30),
+        inset 0 1px 0 rgba(255,255,255,.045),
+        0 0 0 1px rgba(143,232,255,.035);
+      backdrop-filter:blur(16px);
+    }
+
+    .access-card::before {
+      content:"";
+      position:absolute;
+      inset:0;
+      opacity:.055;
+      pointer-events:none;
+      background-image:
+        linear-gradient(rgba(255,255,255,.8) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.8) 1px, transparent 1px);
+      background-size:34px 34px;
+    }
+
+    .access-card > * {
+      position:relative;
+      z-index:2;
+    }
+
+    .logo-wrap {
+      display:flex;
+      justify-content:center;
+      margin-bottom:10px;
+    }
+
+    .logo-box {
+      width:58px;
+      height:58px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      overflow:visible;
+    }
+
+    .logo-box img {
+      width:58px;
+      height:58px;
+      object-fit:contain;
+      display:block;
+      filter:saturate(1.14) contrast(1.08) brightness(1.1) drop-shadow(0 0 14px rgba(104,207,255,.34));
+    }
+
+    h1, h2, h3, h4, p { margin:0; }
+
+    .title {
+      text-align:center;
+      font-size:32px;
+      line-height:.96;
+      letter-spacing:-.055em;
+      font-weight:780;
+      color:white;
+    }
+
+    .subtitle {
+      margin-top:7px;
+      text-align:center;
+      color:rgba(143,232,255,.56);
+      font-size:9px;
+      font-weight:760;
+      letter-spacing:.24em;
+      text-transform:uppercase;
+    }
+
+    .license-area {
+      margin-top:18px;
+    }
+
+    .field-label {
+      display:block;
+      margin:0 0 7px 2px;
+      color:rgba(143,232,255,.56);
+      font-size:9px;
+      font-weight:800;
+      letter-spacing:.22em;
+      text-transform:uppercase;
+    }
+
+    .license-input,
+    .license-select {
+      width:100%;
+      height:44px;
+      padding:0 14px;
+      border-radius:13px;
+      border:1px solid rgba(143,232,255,.16);
+      outline:none;
+      background:rgba(8,22,40,.78);
+      color:white;
+      font-size:13px;
+      font-weight:650;
+      letter-spacing:.04em;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.035);
+      transition:.25s ease;
+    }
+
+    .license-input::placeholder {
+      color:rgba(214,226,240,.38);
+    }
+
+    .license-input:focus,
+    .license-select:focus {
+      border-color:rgba(143,232,255,.42);
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.04),
+        0 0 0 3px rgba(143,232,255,.07);
+    }
+
+    .license-input.error {
+      border-color:rgba(255,103,103,.72) !important;
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.04),
+        0 0 0 3px rgba(255,103,103,.10),
+        0 0 28px rgba(255,103,103,.16) !important;
+    }
+
+    .access-btn {
+      width:100%;
+      height:46px;
+      margin-top:10px;
+      border:0;
+      border-radius:13px;
+      color:#03111d;
+      font-size:13px;
+      font-weight:850;
+      cursor:pointer;
+      background:linear-gradient(135deg, #ffffff 0%, #8fe8ff 48%, #68cfff 100%);
+      box-shadow:
+        0 14px 30px rgba(0,0,0,.22),
+        0 0 28px rgba(104,207,255,.18);
+      transition:.25s ease;
+    }
+
+    .access-btn:hover {
+      transform:translateY(-2px);
+      box-shadow:
+        0 18px 38px rgba(0,0,0,.28),
+        0 0 38px rgba(104,207,255,.28);
+    }
+
+    .license-error {
+      display:none;
+      margin-top:10px;
+      color:rgba(255,177,26,.92);
+      font-size:12px;
+      font-weight:760;
+      text-align:center;
+    }
+
+    .license-error.show {
+      display:block;
+    }
+
+    .divider {
+      display:flex;
+      align-items:center;
+      gap:10px;
+      margin:15px 0 12px;
+      color:rgba(214,226,240,.36);
+      font-size:10px;
+      text-align:center;
+    }
+
+    .divider::before,
+    .divider::after {
+      content:"";
+      flex:1;
+      height:1px;
+      background:rgba(255,255,255,.08);
+    }
+
+    .plan-card {
+      max-width:260px;
+      margin:0 auto 13px;
+      padding:14px 16px;
+      text-align:center;
+      border-radius:18px;
+      border:1px solid rgba(143,232,255,.20);
+      background:
+        radial-gradient(circle at 50% 0%, rgba(143,232,255,.13), transparent 48%),
+        rgba(6,26,49,.38);
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.045),
+        0 0 34px rgba(104,207,255,.08);
+      transition:transform .3s var(--ease), border-color .3s ease, box-shadow .3s ease;
+    }
+
+    .plan-card:hover {
+      transform:translateY(-2px);
+      border-color:rgba(143,232,255,.36);
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.06),
+        0 16px 42px rgba(0,0,0,.18),
+        0 0 36px rgba(104,207,255,.12);
+    }
+
+    .plan-label {
+      color:rgba(143,232,255,.84);
+      font-size:10px;
+      font-weight:800;
+      letter-spacing:.22em;
+      text-transform:uppercase;
+    }
+
+    .plan-price {
+      margin-top:6px;
+      color:white;
+      font-size:38px;
+      line-height:.92;
+      letter-spacing:-.07em;
+      font-weight:520;
+    }
+
+    .payment-shell {
+      position:relative;
+      z-index:2;
+      width:100%;
+      margin-top:0;
+      border-radius:20px;
+      border:1px solid rgba(255,255,255,.08);
+      background:rgba(255,255,255,.025);
+      padding:12px;
+      overflow:hidden;
+    }
+
+    .payment-shell::before {
+      content:"";
+      position:absolute;
+      inset:0;
+      background:radial-gradient(circle at 50% 0%, var(--pay-soft), transparent 46%);
+      opacity:.95;
+      pointer-events:none;
+      transition:.25s ease;
+    }
+
+    .pay-tabs {
+      position:relative;
+      z-index:2;
+      display:grid;
+      grid-template-columns:repeat(3, 1fr);
+      gap:8px;
+    }
+
+    .pay-tab {
+      min-height:42px;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,.08);
+      background:rgba(7,18,33,.82);
+      color:rgba(214,226,240,.62);
+      font-size:12px;
+      font-weight:800;
+      letter-spacing:.08em;
+      cursor:pointer;
+      transition:.25s ease;
+    }
+
+    .pay-tab:hover {
+      color:white;
+      transform:translateY(-1px);
+      border-color:rgba(255,255,255,.14);
+    }
+
+    .pay-tab.active {
+      color:var(--pay-color);
+      border-color:var(--pay-color);
+      box-shadow:
+        inset 0 0 0 1px rgba(255,255,255,.035),
+        0 0 24px var(--pay-soft);
+    }
+
+    .pay-body {
+      position:relative;
+      z-index:2;
+      margin-top:10px;
+      padding:12px;
+      border-radius:15px;
+      border:1px solid rgba(255,255,255,.08);
+      background:rgba(5,17,32,.72);
+      min-height:218px;
+      display:flex;
+      flex-direction:column;
+    }
+
+    .pay-topline {
+      text-align:center;
+      color:rgba(214,226,240,.58);
+      font-size:12px;
+      line-height:1.55;
+      min-height:20px;
+      white-space:nowrap;
+    }
+
+    .pay-topline strong {
+      color:var(--pay-color);
+      font-weight:850;
+    }
+
+    .address-box {
+      margin-top:10px;
+      display:grid;
+      grid-template-columns:minmax(0, 1fr) 72px;
+      gap:8px;
+      align-items:stretch;
+    }
+
+    .address {
+      min-height:58px;
+      height:58px;
+      padding:12px;
+      border-radius:13px;
+      border:1px solid rgba(255,255,255,.08);
+      background:rgba(8,22,40,.82);
+      color:var(--pay-color);
+      font-size:11px;
+      line-height:1.45;
+      font-weight:650;
+      word-break:break-all;
+      overflow:hidden;
+      display:flex;
+      align-items:center;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.03);
+    }
+
+    .copy-btn {
+      min-width:72px;
+      height:58px;
+      border-radius:13px;
+      border:1px solid rgba(255,255,255,.10);
+      background:rgba(255,255,255,.04);
+      color:rgba(255,255,255,.74);
+      font-size:12px;
+      font-weight:800;
+      cursor:pointer;
+      transition:.25s ease;
+    }
+
+    .copy-btn:hover,
+    .copy-btn.copied {
+      color:white;
+      border-color:var(--pay-color);
+      background:var(--pay-soft);
+    }
+
+    .note-box {
+      margin-top:9px;
+      min-height:76px;
+      padding:11px;
+      border-radius:13px;
+      border:1px solid rgba(143,232,255,.12);
+      background:rgba(6,26,49,.38);
+      text-align:center;
+      display:flex;
+      flex-direction:column;
+      justify-content:center;
+    }
+
+    .note-box small {
+      display:block;
+      color:rgba(214,226,240,.50);
+      font-size:11px;
+      margin-bottom:6px;
+    }
+
+    .note-box strong {
+      color:rgba(143,232,255,.92);
+      font-size:15px;
+      line-height:1.45;
+      font-weight:800;
+    }
+
+    .meta-row {
+      margin-top:auto;
+      padding-top:10px;
+      display:flex;
+      align-items:center;
+      justify-content:flex-start;
+      gap:10px;
+      color:rgba(214,226,240,.46);
+      font-size:11px;
+      flex-wrap:nowrap;
+    }
+
+    .status-dot {
+      display:inline-flex;
+      align-items:center;
+      gap:7px;
+    }
+
+    .status-dot::before {
+      content:"";
+      width:7px;
+      height:7px;
+      border-radius:999px;
+      background:var(--pay-color);
+      box-shadow:0 0 14px var(--pay-soft);
+    }
+
+    .loading { opacity:.72; }
+
+    .live-dashboard {
+      position:fixed;
+      inset:0;
+      z-index:200;
+      display:none;
+      background:
+        radial-gradient(circle at 72% 14%, rgba(104,207,255,.08), transparent 30%),
+        radial-gradient(circle at 22% 20%, rgba(143,232,255,.045), transparent 22%),
+        linear-gradient(180deg, #071f39 0%, #08213b 42%, #061a31 100%);
+    }
+
+    body.dashboard-unlocked .live-dashboard { display:block; }
+    body.dashboard-unlocked .access-view { display:none; }
+
+    .dashboard-layout {
+      position:relative;
+      z-index:2;
+      display:grid;
+      grid-template-columns:220px 1fr;
+      width:100%;
+      height:100svh;
+    }
+
+    .sidebar {
+      position:relative;
+      border-right:1px solid rgba(255,255,255,.08);
+      background:rgba(2,13,24,.48);
+      backdrop-filter:blur(16px);
+      padding:20px 16px;
+      overflow:hidden;
+    }
+
+    .sidebar::before {
+      content:"";
+      position:absolute;
+      inset:0;
+      pointer-events:none;
+      opacity:.05;
+      background-image:
+        linear-gradient(rgba(255,255,255,.8) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.8) 1px, transparent 1px);
+      background-size:34px 34px;
+    }
+
+    .sidebar > * {
+      position:relative;
+      z-index:2;
+    }
+
+    .side-brand {
+      display:flex;
+      align-items:center;
+      gap:10px;
+      padding:2px 6px 18px;
+      margin-bottom:18px;
+      border-bottom:1px solid rgba(255,255,255,.07);
+    }
+
+    .side-brand img {
+      width:24px;
+      height:24px;
+      object-fit:contain;
+      filter:drop-shadow(0 0 10px rgba(104,207,255,.28));
+    }
+
+    .side-brand strong {
+      font-size:15px;
+      font-weight:850;
+      letter-spacing:-.03em;
+    }
+
+    .live-dot {
+      width:8px;
+      height:8px;
+      border-radius:999px;
+      background:var(--lime);
+      box-shadow:0 0 14px rgba(183,255,90,.7);
+      margin-left:auto;
+      margin-right:4px;
+    }
+
+    .nav-section {
+      margin-top:22px;
+    }
+
+    .nav-section-label {
+      color:rgba(255,255,255,.34);
+      font-size:10px;
+      font-weight:800;
+      letter-spacing:.22em;
+      text-transform:uppercase;
+      margin:0 10px 10px;
+    }
+
+    .side-menu {
+      display:grid;
+      gap:6px;
+    }
+
+    .side-link {
+      display:flex;
+      align-items:center;
+      gap:10px;
+      min-height:40px;
+      padding:0 12px;
+      border-radius:14px;
+      color:rgba(214,226,240,.70);
+      border:1px solid transparent;
+      transition:.22s ease;
+      font-size:14px;
+      cursor:pointer;
+      background:transparent;
+      text-align:left;
+    }
+
+    .side-link:hover {
+      color:white;
+      background:rgba(255,255,255,.04);
+      border-color:rgba(255,255,255,.07);
+      transform:translateX(2px);
+    }
+
+    .side-link.active {
+      color:white;
+      border-color:rgba(143,232,255,.18);
+      background:linear-gradient(135deg, rgba(104,207,255,.17), rgba(143,232,255,.08));
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.03);
+    }
+
+    .side-link.admin-only {
+      border-color:rgba(183,255,90,.08);
+      display:none;
+    }
+
+    body.admin-mode .side-link.admin-only {
+      display:flex;
+    }
+
+    .side-link .icon {
+      width:18px;
+      text-align:center;
+      opacity:.88;
+    }
+
+    .side-badge {
+      margin-left:auto;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-width:26px;
+      height:20px;
+      padding:0 8px;
+      border-radius:999px;
+      background:rgba(104,207,255,.12);
+      border:1px solid rgba(143,232,255,.14);
+      color:var(--cyan);
+      font-size:11px;
+      font-weight:800;
+    }
+
+    .admin-badge {
+      margin-left:auto;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      height:20px;
+      padding:0 8px;
+      border-radius:999px;
+      background:rgba(183,255,90,.09);
+      border:1px solid rgba(183,255,90,.18);
+      color:var(--lime);
+      font-size:10px;
+      font-weight:900;
+      letter-spacing:.10em;
+    }
+
+    .dashboard-main {
+      min-width:0;
+      display:flex;
+      flex-direction:column;
+      overflow:auto;
+      padding:18px 18px 22px;
+    }
+
+    .topbar {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:16px;
+      margin-bottom:18px;
+      padding:14px 16px;
+      border-radius:20px;
+      border:1px solid rgba(255,255,255,.08);
+      background:rgba(5,18,34,.28);
+      backdrop-filter:blur(14px);
+    }
+
+    .pill-admin {
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      min-height:34px;
+      padding:0 14px;
+      border-radius:999px;
+      border:1px solid rgba(183,255,90,.16);
+      background:rgba(183,255,90,.08);
+      color:var(--lime);
+      font-size:11px;
+      font-weight:900;
+      letter-spacing:.18em;
+      text-transform:uppercase;
+      white-space:nowrap;
+    }
+
+    .pill-admin::before {
+      content:"";
+      width:7px;
+      height:7px;
+      border-radius:999px;
+      background:var(--lime);
+      box-shadow:0 0 14px rgba(183,255,90,.6);
+    }
+
+    .topbar-right {
+      display:flex;
+      align-items:center;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+
+    .top-btn,
+    .logout-btn,
+    .license-btn {
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-height:38px;
+      padding:0 16px;
+      border-radius:14px;
+      cursor:pointer;
+      transition:.22s ease;
+      border:1px solid rgba(255,255,255,.08);
+      background:rgba(255,255,255,.03);
+      color:rgba(214,226,240,.78);
+      font-size:13px;
+      font-weight:750;
+    }
+
+    .top-btn:hover,
+    .logout-btn:hover,
+    .license-btn:hover {
+      color:white;
+      border-color:rgba(143,232,255,.20);
+      background:rgba(255,255,255,.06);
+      transform:translateY(-1px);
+    }
+
+    .primary-btn {
+      background:linear-gradient(135deg, #8fe8ff, #68cfff);
+      color:#03111d;
+      border:0;
+      box-shadow:0 0 20px rgba(104,207,255,.18);
+      font-weight:850;
+    }
+
+    .primary-btn:hover {
+      background:linear-gradient(135deg, #9ef0ff, #79d5ff);
+      color:#03111d;
+    }
+
+    .dashboard-hero {
+      display:grid;
+      grid-template-columns:1fr auto;
+      gap:18px;
+      align-items:start;
+      margin-bottom:18px;
+    }
+
+    .eyebrow {
+      color:var(--cyan);
+      font-size:11px;
+      font-weight:800;
+      letter-spacing:.24em;
+      text-transform:uppercase;
+      margin-bottom:8px;
+    }
+
+    .hero-title {
+      font-size:clamp(40px, 4.7vw, 72px);
+      line-height:.92;
+      letter-spacing:-.07em;
+      font-weight:800;
+      color:white;
+      max-width:700px;
+    }
+
+    .hero-copy {
+      margin-top:10px;
+      color:rgba(214,226,240,.68);
+      font-size:16px;
+      line-height:1.6;
+      max-width:620px;
+    }
+
+    .hero-actions {
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      justify-content:flex-end;
+    }
+
+    .metric-grid {
+      display:grid;
+      grid-template-columns:repeat(4, minmax(0, 1fr));
+      gap:14px;
+      margin-bottom:18px;
+    }
+
+    .metric-card {
+      padding:20px 22px;
+      border-radius:22px;
+      transition:.25s ease;
+    }
+
+    .metric-card.highlight {
+      transform:translateY(-4px);
+      border-color:rgba(143,232,255,.28);
+      box-shadow:0 28px 95px rgba(0,0,0,.24), 0 0 32px rgba(104,207,255,.12);
+    }
+
+    .metric-label {
+      color:rgba(143,232,255,.56);
+      font-size:10px;
+      font-weight:800;
+      letter-spacing:.20em;
+      text-transform:uppercase;
+    }
+
+    .metric-value {
+      margin-top:18px;
+      font-size:clamp(40px, 4vw, 52px);
+      line-height:.95;
+      letter-spacing:-.07em;
+      font-weight:700;
+      color:white;
+    }
+
+    .metric-value.cyan { color:var(--cyan); }
+    .metric-value.lime { color:var(--lime); }
+    .metric-value.orange { color:#ffaf45; }
+
+    .view { display:none; }
+    .view.active { display:block; }
+
+    .table-card {
+      border-radius:26px;
+      padding:16px 0 0;
+      overflow:hidden;
+      transition:.25s ease;
+      margin-bottom:18px;
+    }
+
+    .table-header {
+      padding:0 22px 16px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:16px;
+      border-bottom:1px solid rgba(255,255,255,.07);
+    }
+
+    .table-header h3 {
+      font-size:20px;
+      line-height:1;
+      letter-spacing:-.04em;
+      font-weight:800;
+      color:white;
+    }
+
+    .table-header p {
+      margin-top:5px;
+      color:rgba(255,255,255,.40);
+      font-size:10px;
+      font-weight:800;
+      letter-spacing:.20em;
+      text-transform:uppercase;
+    }
+
+    .live-pill {
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      min-height:30px;
+      padding:0 12px;
+      border-radius:999px;
+      border:1px solid rgba(183,255,90,.16);
+      background:rgba(183,255,90,.08);
+      color:var(--lime);
+      font-size:10px;
+      font-weight:900;
+      letter-spacing:.18em;
+      text-transform:uppercase;
+    }
+
+    .live-pill::before {
+      content:"";
+      width:7px;
+      height:7px;
+      border-radius:999px;
+      background:var(--lime);
+      box-shadow:0 0 12px rgba(183,255,90,.7);
+    }
+
+    .table-wrap { overflow-x:auto; }
+
+    table {
+      width:100%;
+      border-collapse:collapse;
+      min-width:760px;
+    }
+
+    thead th {
+      text-align:left;
+      padding:14px 22px;
+      color:rgba(255,255,255,.38);
+      font-size:11px;
+      font-weight:800;
+      letter-spacing:.16em;
+      text-transform:uppercase;
+      border-bottom:1px solid rgba(255,255,255,.06);
+      white-space:nowrap;
+    }
+
+    tbody td {
+      padding:16px 22px;
+      border-bottom:1px solid rgba(255,255,255,.05);
+      vertical-align:middle;
+      color:rgba(214,226,240,.72);
+    }
+
+    tbody tr { transition:.18s ease; }
+    tbody tr:hover { background:rgba(255,255,255,.025); }
+    tbody tr.hidden-row { display:none; }
+
+    .market-title,
+    .city-title {
+      font-size:16px;
+      line-height:1.15;
+      font-weight:750;
+      color:white;
+    }
+
+    .market-sub,
+    .city-sub {
+      margin-top:5px;
+      color:rgba(214,226,240,.48);
+      font-size:13px;
+      line-height:1.25;
+    }
+
+    .prediction {
+      color:var(--cyan);
+      font-size:32px;
+      line-height:1;
+      letter-spacing:-.05em;
+      font-weight:750;
+      white-space:nowrap;
+    }
+
+    .tag,
+    .status-pill,
+    .license-status {
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-height:28px;
+      padding:0 10px;
+      border-radius:999px;
+      font-size:11px;
+      font-weight:900;
+      letter-spacing:.10em;
+      text-transform:uppercase;
+      border:1px solid transparent;
+      white-space:nowrap;
+    }
+
+    .tag-high,
+    .status-active,
+    .license-valid {
+      color:var(--lime);
+      background:rgba(183,255,90,.10);
+      border-color:rgba(183,255,90,.18);
+    }
+
+    .tag-medium,
+    .status-waiting {
+      color:var(--orange);
+      background:rgba(255,177,26,.10);
+      border-color:rgba(255,177,26,.18);
+    }
+
+    .status-monitoring {
+      color:var(--cyan);
+      background:rgba(104,207,255,.10);
+      border-color:rgba(143,232,255,.16);
+    }
+
+    .status-inactive,
+    .license-used {
+      color:rgba(214,226,240,.62);
+      background:rgba(255,255,255,.045);
+      border-color:rgba(255,255,255,.08);
+    }
+
+    .edge-value {
+      font-size:18px;
+      font-weight:850;
+      color:var(--lime);
+      white-space:nowrap;
+    }
+
+    .trend-bars {
+      display:flex;
+      align-items:flex-end;
+      gap:3px;
+      height:24px;
+    }
+
+    .trend-bars span {
+      width:4px;
+      border-radius:999px;
+      background:linear-gradient(to top, rgba(104,207,255,.46), rgba(143,232,255,.96));
+      box-shadow:0 0 10px rgba(104,207,255,.16);
+    }
+
+    .trend-bars span:nth-child(1) { height:10px; }
+    .trend-bars span:nth-child(2) { height:13px; }
+    .trend-bars span:nth-child(3) { height:16px; }
+    .trend-bars span:nth-child(4) { height:19px; }
+    .trend-bars span:nth-child(5) { height:22px; }
+    .trend-bars span:nth-child(6) { height:24px; }
+
+    .performance-layout {
+      display:grid;
+      grid-template-columns:1fr 320px;
+      gap:18px;
+      align-items:start;
+    }
+
+    .equity-card {
+      border-radius:26px;
+      padding:22px;
+      min-height:430px;
+    }
+
+    .equity-head {
+      display:flex;
+      justify-content:space-between;
+      gap:18px;
+      align-items:flex-start;
+      margin-bottom:18px;
+    }
+
+    .equity-title {
+      font-size:22px;
+      line-height:1;
+      letter-spacing:-.04em;
+      font-weight:850;
+      color:white;
+    }
+
+    .equity-sub {
+      margin-top:6px;
+      color:rgba(214,226,240,.50);
+      font-size:13px;
+    }
+
+    .equity-value {
+      text-align:right;
+      color:var(--lime);
+      font-size:30px;
+      font-weight:850;
+      letter-spacing:-.05em;
+    }
+
+    .equity-chart {
+      position:relative;
+      height:300px;
+      border-radius:22px;
+      border:1px solid rgba(255,255,255,.08);
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.025), rgba(255,255,255,.015)),
+        rgba(5,17,32,.46);
+      overflow:hidden;
+    }
+
+    .equity-chart::before {
+      content:"";
+      position:absolute;
+      inset:0;
+      opacity:.08;
+      background-image:
+        linear-gradient(rgba(255,255,255,.8) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.8) 1px, transparent 1px);
+      background-size:42px 42px;
+    }
+
+    .equity-chart svg {
+      position:absolute;
+      inset:0;
+      width:100%;
+      height:100%;
+      overflow:visible;
+    }
+
+    .equity-area {
+      fill:url(#equityGradient);
+      opacity:.85;
+    }
+
+    .equity-line {
+      fill:none;
+      stroke:var(--cyan);
+      stroke-width:3;
+      stroke-linecap:round;
+      stroke-linejoin:round;
+      filter:drop-shadow(0 0 12px rgba(143,232,255,.38));
+      stroke-dasharray:900;
+      stroke-dashoffset:900;
+      animation:drawEquity 1.4s var(--ease) forwards;
+    }
+
+    .equity-dot {
+      fill:var(--lime);
+      filter:drop-shadow(0 0 12px rgba(183,255,90,.5));
+    }
+
+    .performance-side {
+      display:grid;
+      gap:14px;
+    }
+
+    .mini-card {
+      border-radius:22px;
+      padding:18px;
+    }
+
+    .mini-label {
+      color:rgba(143,232,255,.56);
+      font-size:10px;
+      font-weight:800;
+      letter-spacing:.20em;
+      text-transform:uppercase;
+    }
+
+    .mini-value {
+      margin-top:14px;
+      font-size:38px;
+      line-height:.95;
+      letter-spacing:-.06em;
+      font-weight:800;
+      color:white;
+    }
+
+    .mini-value.lime { color:var(--lime); }
+
+    .mini-copy {
+      margin-top:8px;
+      color:rgba(214,226,240,.56);
+      font-size:13px;
+      line-height:1.5;
+    }
+
+    .licenses-layout {
+      display:grid;
+      grid-template-columns:360px 1fr;
+      gap:18px;
+      align-items:start;
+    }
+
+    .license-generator {
+      border-radius:26px;
+      padding:22px;
+    }
+
+    .license-generator h3 {
+      color:white;
+      font-size:24px;
+      line-height:1;
+      letter-spacing:-.05em;
+      font-weight:850;
+    }
+
+    .license-generator p {
+      margin-top:10px;
+      color:rgba(214,226,240,.58);
+      font-size:14px;
+      line-height:1.55;
+    }
+
+    .license-form {
+      display:grid;
+      gap:12px;
+      margin-top:20px;
+    }
+
+    .license-btn {
+      width:100%;
+      min-height:44px;
+    }
+
+    .generated-key-box {
+      display:none;
+      margin-top:16px;
+      padding:14px;
+      border-radius:16px;
+      border:1px solid rgba(183,255,90,.16);
+      background:rgba(183,255,90,.07);
+      color:var(--lime);
+      font-size:13px;
+      font-weight:800;
+      line-height:1.45;
+      word-break:break-all;
+    }
+
+    .generated-key-box.show { display:block; }
+
+    .license-note {
+      margin-top:16px;
+      padding:14px;
+      border-radius:16px;
+      border:1px solid rgba(143,232,255,.12);
+      background:rgba(143,232,255,.045);
+      color:rgba(214,226,240,.56);
+      font-size:12px;
+      line-height:1.6;
+    }
+
+    .toast-stack {
+      position:fixed;
+      right:22px;
+      bottom:22px;
+      z-index:999;
+      display:grid;
+      gap:10px;
+      pointer-events:none;
+    }
+
+    .toast {
+      min-width:260px;
+      max-width:360px;
+      padding:14px 16px;
+      border-radius:18px;
+      border:1px solid rgba(143,232,255,.16);
+      background:
+        radial-gradient(circle at 20% 0%, rgba(143,232,255,.12), transparent 42%),
+        rgba(5,18,34,.88);
+      color:white;
+      box-shadow:0 18px 48px rgba(0,0,0,.32), inset 0 1px 0 rgba(255,255,255,.05);
+      backdrop-filter:blur(16px);
+      transform:translateY(14px) scale(.96);
+      opacity:0;
+      animation:toastIn .32s var(--ease) forwards;
+    }
+
+    .toast strong {
+      display:block;
+      font-size:13px;
+      letter-spacing:-.01em;
+    }
+
+    .toast span {
+      display:block;
+      margin-top:4px;
+      color:rgba(214,226,240,.62);
+      font-size:12px;
+      line-height:1.45;
+    }
+
+    .toast.success strong { color:var(--lime); }
+    .toast.error strong { color:#ff9a9a; }
+    .toast.info strong { color:var(--cyan); }
+
+    .button-ripple::after {
+      content:"";
+      position:absolute;
+      width:12px;
+      height:12px;
+      left:var(--ripple-x, 50%);
+      top:var(--ripple-y, 50%);
+      border-radius:999px;
+      background:rgba(255,255,255,.44);
+      transform:translate(-50%, -50%) scale(0);
+      opacity:0;
+      pointer-events:none;
+    }
+
+    .button-ripple.rippling::after {
+      animation:ripple .55s ease;
+    }
+
+    .shake { animation:shakeKey .42s var(--ease); }
+
+    @keyframes toastIn {
+      to { transform:translateY(0) scale(1); opacity:1; }
+    }
+
+    @keyframes toastOut {
+      to { transform:translateY(12px) scale(.96); opacity:0; }
+    }
+
+    @keyframes ripple {
+      0% { transform:translate(-50%, -50%) scale(0); opacity:.45; }
+      100% { transform:translate(-50%, -50%) scale(24); opacity:0; }
+    }
+
+    @keyframes shakeKey {
+      0%, 100% { transform:translateX(0); }
+      20% { transform:translateX(-7px); }
+      40% { transform:translateX(7px); }
+      60% { transform:translateX(-5px); }
+      80% { transform:translateX(5px); }
+    }
+
+    @keyframes drawEquity {
+      to { stroke-dashoffset:0; }
+    }
+
+    @media (max-width:1180px) {
+      .metric-grid { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+      .dashboard-hero,
+      .performance-layout,
+      .licenses-layout { grid-template-columns:1fr; }
+      .hero-actions { justify-content:flex-start; }
+    }
+
+    @media (max-width:940px) {
+      body { overflow:auto; }
+      .page { overflow:visible; }
+      .live-dashboard { position:relative; min-height:100svh; }
+      .dashboard-layout { grid-template-columns:1fr; height:auto; min-height:100svh; }
+      .sidebar { border-right:0; border-bottom:1px solid rgba(255,255,255,.08); }
+      .dashboard-main { overflow:visible; }
+      .side-menu { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+      .access-container { min-height:calc(100svh - 68px); }
+    }
+
+    @media (max-width:760px) {
+      .metric-grid { grid-template-columns:1fr; }
+      .dashboard-main { padding:14px; }
+      .topbar { flex-direction:column; align-items:flex-start; }
+      .topbar-right { width:100%; }
+      .hero-title { font-size:42px; }
+      .nav { padding:12px 14px 0; }
+      .brand-text { font-size:11px; }
+      .back-link { min-height:36px; padding:0 13px; font-size:10px; }
+      .access-container { width:min(100%, calc(100% - 24px)); }
+      .access-shell { width:min(100%, 380px); }
+      .address-box { grid-template-columns:1fr; }
+      .address { height:auto; min-height:54px; }
+      .copy-btn { min-height:42px; height:42px; }
+      .side-menu { grid-template-columns:1fr; }
+      .equity-chart { height:240px; }
+    }
+
+    @media (max-height:760px) and (min-width:941px) {
+      .nav { padding-top:10px; }
+      .nav-inner { padding:8px 13px; }
+      .access-container { min-height:calc(100svh - 56px); }
+      .access-shell { width:min(100%, 380px); }
+      .access-card { padding:14px; min-height:640px; }
+      .logo-box { width:52px; height:52px; }
+      .logo-box img { width:52px; height:52px; }
+      .title { font-size:27px; }
+      .subtitle { font-size:8px; }
+      .license-area { margin-top:12px; }
+      .license-input { height:38px; }
+      .access-btn { height:40px; }
+      .divider { margin:10px 0 8px; }
+      .plan-card { padding:10px 14px; margin-bottom:9px; }
+      .plan-price { font-size:31px; }
+      .pay-tab { min-height:36px; }
+      .pay-body { min-height:210px; padding:10px; }
+      .address { height:52px; min-height:52px; font-size:10.5px; }
+      .copy-btn { height:52px; min-height:52px; }
+      .note-box { min-height:66px; padding:9px; }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="page">
+    <div class="ambient-grid" aria-hidden="true"></div>
+    <div class="page-glow" aria-hidden="true"></div>
+    <div class="cursor-light" id="cursorLight" aria-hidden="true"></div>
+
+    <div class="access-view">
+      <nav class="nav" aria-label="Dashboard navigation">
+        <div class="nav-inner">
+          <a class="brand" href="index.html" aria-label="Weathrly">
+            <span class="brand-logo" aria-hidden="true">
+              <img src="weatherbot-logo.png" alt="" />
+            </span>
+            <span class="brand-text">Weathrly</span>
+          </a>
+          <a class="back-link" href="index.html" title="Weathrly">Back to site</a>
+        </div>
+      </nav>
+
+      <main class="access-container">
+        <section class="access-shell" aria-label="Dashboard access">
+          <div class="access-card">
+            <div class="logo-wrap">
+              <div class="logo-box">
+                <img src="weatherbot-logo.png" alt="Weathrly logo" />
+              </div>
+            </div>
+
+            <h1 class="title">Weathrly</h1>
+            <p class="subtitle">Dashboard Access</p>
+
+            <div class="license-area">
+              <label class="field-label" for="licenseKey">License key</label>
+              <input class="license-input" id="licenseKey" type="text" placeholder="WR-XXXX-XXXX-XXXX" autocomplete="off" />
+              <button class="access-btn" id="accessBtn" type="button">Access Dashboard →</button>
+              <div class="license-error" id="licenseError">Invalid access key. Please check your credentials.</div>
+            </div>
+
+            <div class="divider">or purchase lifetime</div>
+
+            <div class="plan-card">
+              <div class="plan-label">Lifetime</div>
+              <div class="plan-price">$199</div>
+            </div>
+
+            <div class="payment-shell" id="paymentShell">
+              <div class="pay-tabs" role="tablist" aria-label="Payment methods">
+                <button class="pay-tab active" type="button" data-coin="btc">₿ BTC</button>
+                <button class="pay-tab" type="button" data-coin="eth">Ξ ETH</button>
+                <button class="pay-tab" type="button" data-coin="sol">◎ SOL</button>
+              </div>
+
+              <div class="pay-body">
+                <div class="pay-topline loading" id="payTopline">Loading live price...</div>
+
+                <div class="address-box">
+                  <div class="address" id="addressBox">bc1pw3msqjmpf2pj6w399n7snp8xwh7z8jqcsehx20m84t0tydjj67esfc9qyn</div>
+                  <button class="copy-btn" id="copyBtn" type="button">Copy</button>
+                </div>
+
+                <div class="note-box">
+                  <small>Once sent, DM on Telegram:</small>
+                  <strong><a href="https://t.me/AlphaEdgeDev" target="_blank" rel="noopener">@AlphaEdgeDev</a></strong>
+                </div>
+
+                <div class="meta-row">
+                  <div class="status-dot" id="rateStatus">BTC selected</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <section class="live-dashboard" id="liveDashboard" aria-label="Weathrly live dashboard">
+      <div class="dashboard-layout">
+        <aside class="sidebar">
+          <div class="side-brand">
+            <img src="weatherbot-logo.png" alt="Weathrly logo" />
+            <strong>Weathrly</strong>
+            <span class="live-dot" aria-hidden="true"></span>
+          </div>
+
+          <div class="nav-section">
+            <div class="nav-section-label">Overview</div>
+            <div class="side-menu">
+              <button class="side-link active" type="button" data-view="signals">
+                <span class="icon">⚡</span>
+                <span>Live Signals</span>
+                <span class="side-badge" id="activeSignalBadge">5</span>
+              </button>
+              <button class="side-link" type="button" data-view="cities">
+                <span class="icon">🛰️</span>
+                <span>Tracked Cities</span>
+              </button>
+              <button class="side-link" type="button" data-view="performance">
+                <span class="icon">📈</span>
+                <span>Performance</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="nav-section">
+            <div class="nav-section-label">Admin</div>
+            <div class="side-menu">
+              <button class="side-link admin-only" type="button" data-view="licenses" id="licensesNav">
+                <span class="icon">🔑</span>
+                <span>Licenses</span>
+                <span class="admin-badge">Admin</span>
+              </button>
+            </div>
+          </div>
+        </aside>
+
+        <main class="dashboard-main">
+          <div class="topbar">
+            <span class="pill-admin" id="rolePill">Dashboard Access</span>
+
+            <div class="topbar-right">
+              <button class="logout-btn" id="logoutBtn" type="button">Log out</button>
+            </div>
+          </div>
+
+          <section class="dashboard-hero">
+            <div>
+              <div class="eyebrow" id="dashboardEyebrow">Live Intelligence</div>
+              <h1 class="hero-title" id="dashboardTitle">Signal command.</h1>
+              <p class="hero-copy" id="dashboardCopy">Real-time temperature predictions across all tracked markets.</p>
+            </div>
+
+            <div class="hero-actions">
+              <button class="top-btn" id="refreshBtn" type="button">Refresh</button>
+              <button class="top-btn" id="filterBtn" type="button">Filter: All</button>
+            </div>
+          </section>
+
+          <section class="metric-grid">
+            <article class="metric-card glass" id="metricSignals">
+              <div class="metric-label">Active Signals</div>
+              <div class="metric-value cyan" id="activeSignalsValue">5</div>
+            </article>
+
+            <article class="metric-card glass">
+              <div class="metric-label">Tracked Cities</div>
+              <div class="metric-value" id="trackedCitiesValue">12</div>
+            </article>
+
+            <article class="metric-card glass">
+              <div class="metric-label">Avg Edge</div>
+              <div class="metric-value lime">+18%</div>
+            </article>
+
+            <article class="metric-card glass">
+              <div class="metric-label">Equity Growth</div>
+              <div class="metric-value orange">+34%</div>
+            </article>
+          </section>
+
+          <section class="view active" id="view-signals">
+            <div class="table-card glass" id="signalsCard">
+              <div class="table-header">
+                <div>
+                  <h3>Live Signals</h3>
+                  <p id="updatedText">Updated every 5 minutes</p>
+                </div>
+                <span class="live-pill">Live</span>
+              </div>
+
+              <div class="table-wrap">
+                <table id="signalsTable">
+                  <thead>
+                    <tr>
+                      <th>Market</th>
+                      <th>Prediction</th>
+                      <th>Confidence</th>
+                      <th>Edge</th>
+                      <th>Trend</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="signalsBody">
+                    <tr data-confidence="high">
+                      <td><div class="market-title">Highest temp in London</div><div class="market-sub">Apr 22 · GFS/ECMWF blend</div></td>
+                      <td><div class="prediction">15°C</div></td>
+                      <td><span class="tag tag-high">High</span></td>
+                      <td><div class="edge-value">+22%</div></td>
+                      <td><div class="trend-bars"><span></span><span></span><span></span><span></span><span></span><span></span></div></td>
+                      <td><span class="status-pill status-active">Active</span></td>
+                    </tr>
+
+                    <tr data-confidence="high">
+                      <td><div class="market-title">Highest temp in Phoenix</div><div class="market-sub">Sat · Heat threshold</div></td>
+                      <td><div class="prediction">111°F</div></td>
+                      <td><span class="tag tag-high">High</span></td>
+                      <td><div class="edge-value">+19%</div></td>
+                      <td><div class="trend-bars"><span></span><span></span><span></span><span></span><span></span><span></span></div></td>
+                      <td><span class="status-pill status-active">Active</span></td>
+                    </tr>
+
+                    <tr data-confidence="medium">
+                      <td><div class="market-title">Highest temp in Madrid</div><div class="market-sub">Tomorrow · Market lag detected</div></td>
+                      <td><div class="prediction">27°C</div></td>
+                      <td><span class="tag tag-medium">Medium</span></td>
+                      <td><div class="edge-value">+14%</div></td>
+                      <td><div class="trend-bars"><span></span><span></span><span></span><span></span><span></span><span></span></div></td>
+                      <td><span class="status-pill status-active">Active</span></td>
+                    </tr>
+
+                    <tr data-confidence="medium">
+                      <td><div class="market-title">Highest temp in Miami</div><div class="market-sub">Sun · Humidity model adjustment</div></td>
+                      <td><div class="prediction">92°F</div></td>
+                      <td><span class="tag tag-medium">Medium</span></td>
+                      <td><div class="edge-value">+11%</div></td>
+                      <td><div class="trend-bars"><span></span><span></span><span></span><span></span><span></span><span></span></div></td>
+                      <td><span class="status-pill status-active">Active</span></td>
+                    </tr>
+
+                    <tr data-confidence="high">
+                      <td><div class="market-title">Highest temp in Berlin</div><div class="market-sub">Mon · Forecast revision pending</div></td>
+                      <td><div class="prediction">21°C</div></td>
+                      <td><span class="tag tag-high">High</span></td>
+                      <td><div class="edge-value">+17%</div></td>
+                      <td><div class="trend-bars"><span></span><span></span><span></span><span></span><span></span><span></span></div></td>
+                      <td><span class="status-pill status-active">Active</span></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <section class="view" id="view-cities">
+            <div class="table-card glass">
+              <div class="table-header">
+                <div>
+                  <h3>Tracked Cities</h3>
+                  <p>All monitored highest-temperature markets and current signal state</p>
+                </div>
+                <span class="live-pill">12 Cities</span>
+              </div>
+
+              <div class="table-wrap">
+                <table id="citiesTable">
+                  <thead>
+                    <tr>
+                      <th>City</th>
+                      <th>Market Focus</th>
+                      <th>Signal State</th>
+                      <th>Last Update</th>
+                    </tr>
+                  </thead>
+                  <tbody id="citiesBody">
+                    <tr data-city-status="active"><td><div class="city-title">London</div><div class="city-sub">United Kingdom</div></td><td>Highest temperature</td><td><span class="status-pill status-active">Active Signal</span></td><td>2 min ago</td></tr>
+                    <tr data-city-status="active"><td><div class="city-title">Phoenix</div><div class="city-sub">United States</div></td><td>Highest temperature</td><td><span class="status-pill status-active">Active Signal</span></td><td>4 min ago</td></tr>
+                    <tr data-city-status="waiting"><td><div class="city-title">Madrid</div><div class="city-sub">Spain</div></td><td>Highest temperature</td><td><span class="status-pill status-waiting">Waiting</span></td><td>7 min ago</td></tr>
+                    <tr data-city-status="monitoring"><td><div class="city-title">Berlin</div><div class="city-sub">Germany</div></td><td>Highest temperature</td><td><span class="status-pill status-monitoring">Monitoring</span></td><td>10 min ago</td></tr>
+                    <tr data-city-status="active"><td><div class="city-title">Miami</div><div class="city-sub">United States</div></td><td>Highest temperature</td><td><span class="status-pill status-active">Active Signal</span></td><td>12 min ago</td></tr>
+                    <tr data-city-status="monitoring"><td><div class="city-title">Tokyo</div><div class="city-sub">Japan</div></td><td>Highest temperature</td><td><span class="status-pill status-monitoring">Monitoring</span></td><td>16 min ago</td></tr>
+                    <tr data-city-status="inactive"><td><div class="city-title">Paris</div><div class="city-sub">France</div></td><td>Highest temperature</td><td><span class="status-pill status-inactive">No Signal</span></td><td>22 min ago</td></tr>
+                    <tr data-city-status="waiting"><td><div class="city-title">Dubai</div><div class="city-sub">UAE</div></td><td>Highest temperature</td><td><span class="status-pill status-waiting">Waiting</span></td><td>31 min ago</td></tr>
+                    <tr data-city-status="monitoring"><td><div class="city-title">New York</div><div class="city-sub">United States</div></td><td>Highest temperature</td><td><span class="status-pill status-monitoring">Monitoring</span></td><td>36 min ago</td></tr>
+                    <tr data-city-status="active"><td><div class="city-title">Sydney</div><div class="city-sub">Australia</div></td><td>Highest temperature</td><td><span class="status-pill status-active">Active Signal</span></td><td>43 min ago</td></tr>
+                    <tr data-city-status="inactive"><td><div class="city-title">Toronto</div><div class="city-sub">Canada</div></td><td>Highest temperature</td><td><span class="status-pill status-inactive">No Signal</span></td><td>52 min ago</td></tr>
+                    <tr data-city-status="monitoring"><td><div class="city-title">Singapore</div><div class="city-sub">Singapore</div></td><td>Highest temperature</td><td><span class="status-pill status-monitoring">Monitoring</span></td><td>1 hr ago</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <section class="view" id="view-performance">
+            <div class="performance-layout">
+              <article class="equity-card glass">
+                <div class="equity-head">
+                  <div>
+                    <h3 class="equity-title">Equity Curve</h3>
+                    <p class="equity-sub">Demo performance curve for weather-market signals.</p>
+                  </div>
+                  <div class="equity-value">+34.8%</div>
+                </div>
+
+                <div class="equity-chart">
+                  <svg viewBox="0 0 900 300" preserveAspectRatio="none" aria-hidden="true">
+                    <defs>
+                      <linearGradient id="equityGradient" x1="0" x2="0" y1="0" y2="1">
+                        <stop offset="0%" stop-color="#8fe8ff" stop-opacity=".30"></stop>
+                        <stop offset="100%" stop-color="#8fe8ff" stop-opacity="0"></stop>
+                      </linearGradient>
+                    </defs>
+                    <path class="equity-area" d="M0 245 C60 232 92 220 132 225 C188 232 210 172 265 178 C320 186 340 132 395 142 C455 153 478 110 538 120 C606 132 626 78 690 88 C762 98 792 42 900 52 L900 300 L0 300 Z"></path>
+                    <path class="equity-line" d="M0 245 C60 232 92 220 132 225 C188 232 210 172 265 178 C320 186 340 132 395 142 C455 153 478 110 538 120 C606 132 626 78 690 88 C762 98 792 42 900 52"></path>
+                    <circle class="equity-dot" cx="900" cy="52" r="6"></circle>
+                  </svg>
+                </div>
+              </article>
+
+              <aside class="performance-side">
+                <article class="mini-card glass">
+                  <div class="mini-label">Win rate</div>
+                  <div class="mini-value lime">78%</div>
+                  <p class="mini-copy">Across closed demo signals.</p>
+                </article>
+
+                <article class="mini-card glass">
+                  <div class="mini-label">Total signals</div>
+                  <div class="mini-value">146</div>
+                  <p class="mini-copy">Tracked since strategy start.</p>
+                </article>
+
+                <article class="mini-card glass">
+                  <div class="mini-label">Average edge</div>
+                  <div class="mini-value">+18%</div>
+                  <p class="mini-copy">Mean probability mismatch.</p>
+                </article>
+
+                <article class="mini-card glass">
+                  <div class="mini-label">Max drawdown</div>
+                  <div class="mini-value">-6%</div>
+                  <p class="mini-copy">Demo only. Not financial advice.</p>
+                </article>
+              </aside>
+            </div>
+          </section>
+
+          <section class="view" id="view-licenses">
+            <div class="licenses-layout">
+              <article class="license-generator glass">
+                <h3>Generate license key.</h3>
+                <p>Admin-only panel for generating lifetime access keys through Supabase Edge Functions.</p>
+
+                <div class="license-form">
+                  <label class="field-label" for="licensePlan">Plan</label>
+                  <select class="license-select" id="licensePlan">
+                    <option value="Lifetime" selected>Lifetime</option>
+                  </select>
+
+                  <button class="license-btn primary-btn" id="generateLicenseBtn" type="button">Generate Valid Key</button>
+                </div>
+
+                <div class="generated-key-box" id="generatedKeyBox"></div>
+
+                <div class="license-note">
+                  Admin credentials are verified server-side. The admin key is not stored in this HTML file.
+                </div>
+              </article>
+
+              <div class="table-card glass">
+                <div class="table-header">
+                  <div>
+                    <h3>License Keys</h3>
+                    <p>Admin-only generated keys</p>
+                  </div>
+                  <span class="live-pill">Admin</span>
+                </div>
+
+                <div class="table-wrap">
+                  <table id="licensesTable">
+                    <thead>
+                      <tr>
+                        <th>License Key</th>
+                        <th>Plan</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                        <th>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody id="licensesBody">
+                      <tr>
+                        <td><div class="market-title">No generated keys yet</div></td>
+                        <td>Lifetime</td>
+                        <td><span class="license-status license-used">Waiting</span></td>
+                        <td>-</td>
+                        <td>-</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </section>
+        </main>
+      </div>
+    </section>
+
+    <div class="toast-stack" id="toastStack" aria-live="polite"></div>
+  </div>
+
+  <script>
+    (function () {
+      const SUPABASE_URL = "https://bdlenvshuksivodngsnd.supabase.co";
+      const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkbGVudnNodWtzaXZvZG5nc25kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4MTAwNzcsImV4cCI6MjA5MzM4NjA3N30.qTpbWsIzeys-IQ1VPtEj9SXSSwthseYEv3g_UFEqd_Y";
+
+      const PRICE_USD = 199;
+
+      const hasSupabaseConfig =
+        SUPABASE_URL !== "PASTE_SUPABASE_URL_HERE" &&
+        SUPABASE_ANON_KEY !== "PASTE_SUPABASE_ANON_KEY_HERE" &&
+        window.supabase;
+
+      const supabaseClient = hasSupabaseConfig
+        ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+        : null;
+
+      const COINS = {
+        btc: {
+          id: "bitcoin",
+          symbol: "BTC",
+          color: "#ffb11a",
+          soft: "rgba(255,177,26,.18)",
+          address: "bc1pw3msqjmpf2pj6w399n7snp8xwh7z8jqcsehx20m84t0tydjj67esfc9qyn",
+          decimals: 6
+        },
+        eth: {
+          id: "ethereum",
+          symbol: "ETH",
+          color: "#58a6ff",
+          soft: "rgba(88,166,255,.18)",
+          address: "0x041e2EB85F0A397eFE9132816850Ea6671319E58",
+          decimals: 5
+        },
+        sol: {
+          id: "solana",
+          symbol: "SOL",
+          color: "#b46bff",
+          soft: "rgba(180,107,255,.18)",
+          address: "Dcd2Q4JTYGL7dZFWQ3MvpVTCBWFdwYcencNiM79Q5Xvr",
+          decimals: 4
+        }
+      };
+
+      let prices = {
+        bitcoin: 102000,
+        ethereum: 3200,
+        solana: 160
+      };
+
+      let activeCoin = "btc";
+      let filterMode = "all";
+      let currentView = "signals";
+      let didInitialRender = false;
+      let isAdmin = false;
+      let weathrlySessionToken = "";
+
+      const root = document.documentElement;
+      const cursorLight = document.getElementById("cursorLight");
+      const payTabs = Array.from(document.querySelectorAll(".pay-tab"));
+      const payTopline = document.getElementById("payTopline");
+      const addressBox = document.getElementById("addressBox");
+      const copyBtn = document.getElementById("copyBtn");
+      const rateStatus = document.getElementById("rateStatus");
+      const accessBtn = document.getElementById("accessBtn");
+      const licenseKey = document.getElementById("licenseKey");
+      const licenseError = document.getElementById("licenseError");
+      const logoutBtn = document.getElementById("logoutBtn");
+      const toastStack = document.getElementById("toastStack");
+      const refreshBtn = document.getElementById("refreshBtn");
+      const filterBtn = document.getElementById("filterBtn");
+      const signalsBody = document.getElementById("signalsBody");
+      const citiesBody = document.getElementById("citiesBody");
+      const licensesBody = document.getElementById("licensesBody");
+      const activeSignalsValue = document.getElementById("activeSignalsValue");
+      const activeSignalBadge = document.getElementById("activeSignalBadge");
+      const trackedCitiesValue = document.getElementById("trackedCitiesValue");
+      const updatedText = document.getElementById("updatedText");
+      const dashboardEyebrow = document.getElementById("dashboardEyebrow");
+      const dashboardTitle = document.getElementById("dashboardTitle");
+      const dashboardCopy = document.getElementById("dashboardCopy");
+      const generateLicenseBtn = document.getElementById("generateLicenseBtn");
+      const generatedKeyBox = document.getElementById("generatedKeyBox");
+      const rolePill = document.getElementById("rolePill");
+
+      function showToast(type, title, message) {
+        if (!toastStack) return;
+
+        const toast = document.createElement("div");
+        toast.className = "toast " + type;
+        toast.innerHTML = "<strong>" + escapeHTML(title) + "</strong><span>" + escapeHTML(message) + "</span>";
+
+        toastStack.appendChild(toast);
+
+        window.setTimeout(function () {
+          toast.style.animation = "toastOut .26s ease forwards";
+          window.setTimeout(function () {
+            toast.remove();
+          }, 280);
+        }, 2600);
+      }
+
+      function addRipple(event) {
+        const target = event.currentTarget;
+        const rect = target.getBoundingClientRect();
+
+        target.classList.add("button-ripple");
+        target.style.setProperty("--ripple-x", event.clientX - rect.left + "px");
+        target.style.setProperty("--ripple-y", event.clientY - rect.top + "px");
+
+        target.classList.remove("rippling");
+        void target.offsetWidth;
+        target.classList.add("rippling");
+
+        window.setTimeout(function () {
+          target.classList.remove("rippling");
+        }, 560);
+      }
+
+      function setTheme(coinKey) {
+        const coin = COINS[coinKey];
+
+        root.style.setProperty("--pay-color", coin.color);
+        root.style.setProperty("--pay-soft", coin.soft);
+
+        payTabs.forEach(function (tab) {
+          tab.classList.toggle("active", tab.dataset.coin === coinKey);
+        });
+      }
+
+      function formatCryptoAmount(amount, decimals) {
+        return Number(amount).toFixed(decimals);
+      }
+
+      function renderCoin(coinKey, shouldToast) {
+        activeCoin = coinKey;
+
+        const coin = COINS[coinKey];
+        const usdValue = prices[coin.id];
+        const amount = usdValue && Number.isFinite(usdValue) && usdValue > 0
+          ? PRICE_USD / usdValue
+          : 0;
+
+        setTheme(coinKey);
+
+        payTopline.classList.remove("loading");
+        payTopline.innerHTML = "Send <strong>" + formatCryptoAmount(amount, coin.decimals) + " " + coin.symbol + "</strong> to:";
+        addressBox.textContent = coin.address;
+        rateStatus.textContent = coin.symbol + " selected";
+        copyBtn.classList.remove("copied");
+        copyBtn.textContent = "Copy";
+
+        if (shouldToast) {
+          showToast("success", coin.symbol + " selected", "Payment amount and wallet address updated.");
+        }
+      }
+
+      async function loadPrices() {
+        try {
+          const response = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana&vs_currencies=usd", {
+            headers: { accept: "application/json" }
+          });
+
+          if (!response.ok) throw new Error("CoinGecko request failed");
+
+          const data = await response.json();
+
+          if (data.bitcoin && data.bitcoin.usd) prices.bitcoin = data.bitcoin.usd;
+          if (data.ethereum && data.ethereum.usd) prices.ethereum = data.ethereum.usd;
+          if (data.solana && data.solana.usd) prices.solana = data.solana.usd;
+        } catch (error) {
+          console.warn("CoinGecko fetch failed. Using fallback prices.", error);
+        } finally {
+          renderCoin(activeCoin, false);
+        }
+      }
+
+      function failAccess() {
+        licenseError.classList.add("show");
+        licenseKey.classList.add("error", "shake");
+        licenseKey.focus();
+
+        window.setTimeout(function () {
+          licenseKey.classList.remove("shake");
+        }, 460);
+
+        window.setTimeout(function () {
+          licenseKey.classList.remove("error");
+        }, 1600);
+
+        showToast("error", "Invalid access key", "Please check your credentials and try again.");
+      }
+
+      async function unlockDashboard() {
+        const key = licenseKey.value.trim();
+
+        if (!key) {
+          failAccess();
+          return;
+        }
+
+        if (!supabaseClient) {
+          showToast("error", "Supabase not configured", "Paste your Supabase URL and anon key into dashboard.html.");
+          return;
+        }
+
+        accessBtn.textContent = "Checking...";
+
+        try {
+          const { data, error } = await supabaseClient.functions.invoke("verify-license", {
+            body: { key: key }
+          });
+
+          accessBtn.textContent = "Access Dashboard →";
+
+          if (error || !data || !data.ok) {
+            failAccess();
+            return;
+          }
+
+          weathrlySessionToken = data.sessionToken || "";
+          isAdmin = data.role === "admin";
+
+          document.body.classList.add("dashboard-unlocked");
+          document.body.classList.toggle("admin-mode", isAdmin);
+
+          rolePill.textContent = isAdmin ? "Admin Dashboard" : "Member Dashboard";
+
+          licenseError.classList.remove("show");
+          licenseKey.classList.remove("error", "shake");
+
+          if (!isAdmin && currentView === "licenses") {
+            switchView("signals");
+          }
+
+          showToast("success", "Access granted", "Welcome to Weathrly.");
+        } catch (error) {
+          accessBtn.textContent = "Access Dashboard →";
+          failAccess();
+        }
+      }
+
+      function logoutDashboard() {
+        document.body.classList.remove("dashboard-unlocked");
+        document.body.classList.remove("admin-mode");
+        isAdmin = false;
+        weathrlySessionToken = "";
+        switchView("signals");
+        showToast("info", "Logged out", "Returned to dashboard access.");
+      }
+
+      function switchView(viewName) {
+        if (viewName === "licenses" && !isAdmin) {
+          showToast("error", "Admin only", "This section requires admin access.");
+          return;
+        }
+
+        currentView = viewName;
+        filterMode = "all";
+
+        document.querySelectorAll(".view").forEach(function (view) {
+          view.classList.remove("active");
+        });
+
+        document.querySelectorAll(".side-link").forEach(function (link) {
+          link.classList.toggle("active", link.dataset.view === viewName);
+        });
+
+        const activeView = document.getElementById("view-" + viewName);
+        if (activeView) activeView.classList.add("active");
+
+        if (viewName === "signals") {
+          dashboardEyebrow.textContent = "Live Intelligence";
+          dashboardTitle.textContent = "Signal command.";
+          dashboardCopy.textContent = "Real-time temperature predictions across all tracked markets.";
+          filterBtn.textContent = "Filter: All";
+        }
+
+        if (viewName === "cities") {
+          dashboardEyebrow.textContent = "Tracked Cities";
+          dashboardTitle.textContent = "City monitor.";
+          dashboardCopy.textContent = "Every tracked city with its current highest-temperature signal state.";
+          filterBtn.textContent = "Filter: All";
+        }
+
+        if (viewName === "performance") {
+          dashboardEyebrow.textContent = "Performance";
+          dashboardTitle.textContent = "Equity curve.";
+          dashboardCopy.textContent = "Demo view of strategy performance, growth curve, win rate, drawdown, and signal quality.";
+          filterBtn.textContent = "Highlight Curve";
+        }
+
+        if (viewName === "licenses") {
+          dashboardEyebrow.textContent = "Admin Licenses";
+          dashboardTitle.textContent = "License control.";
+          dashboardCopy.textContent = "Generate and manage lifetime license keys. This section is admin-only.";
+          filterBtn.textContent = "Admin Mode";
+        }
+
+        clearFilters();
+        showToast("info", viewTitle(viewName), "Dashboard view changed.");
+      }
+
+      function viewTitle(viewName) {
+        if (viewName === "signals") return "Live Signals";
+        if (viewName === "cities") return "Tracked Cities";
+        if (viewName === "performance") return "Performance";
+        if (viewName === "licenses") return "Licenses";
+        return "Dashboard";
+      }
+
+      function countRows() {
+        const signalRows = Array.from(signalsBody.querySelectorAll("tr"));
+        const cityRows = Array.from(citiesBody.querySelectorAll("tr"));
+
+        activeSignalsValue.textContent = signalRows.length;
+        activeSignalBadge.textContent = signalRows.length;
+        trackedCitiesValue.textContent = cityRows.length;
+      }
+
+      function escapeHTML(value) {
+        return String(value)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#039;");
+      }
+
+      function refreshSignals() {
+        const cards = document.querySelectorAll(".metric-card, .table-card, .equity-card, .mini-card");
+
+        cards.forEach(function (card, index) {
+          window.setTimeout(function () {
+            card.classList.add("highlight");
+
+            window.setTimeout(function () {
+              card.classList.remove("highlight");
+            }, 420);
+          }, index * 50);
+        });
+
+        const now = new Date();
+        updatedText.textContent = "Updated just now · " + now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+        showToast("success", "Dashboard refreshed", "Latest local demo data is now visible.");
+      }
+
+      function clearFilters() {
+        filterMode = "all";
+        document.querySelectorAll("tbody tr").forEach(function (row) {
+          row.classList.remove("hidden-row");
+        });
+
+        if (currentView === "signals" || currentView === "cities") filterBtn.textContent = "Filter: All";
+      }
+
+      function toggleFilter() {
+        if (currentView === "signals") {
+          filterMode = filterMode === "all" ? "high" : "all";
+          filterBtn.textContent = filterMode === "all" ? "Filter: All" : "Filter: High";
+
+          Array.from(document.querySelectorAll("#signalsBody tr")).forEach(function (row) {
+            const shouldHide = filterMode === "high" && row.dataset.confidence !== "high";
+            row.classList.toggle("hidden-row", shouldHide);
+          });
+
+          showToast("info", filterMode === "all" ? "Filter cleared" : "High confidence only", filterMode === "all" ? "All live signals are visible again." : "Showing only high-confidence temperature signals.");
+          return;
+        }
+
+        if (currentView === "cities") {
+          filterMode = filterMode === "all" ? "active" : "all";
+          filterBtn.textContent = filterMode === "all" ? "Filter: All" : "Filter: Active";
+
+          Array.from(document.querySelectorAll("#citiesBody tr")).forEach(function (row) {
+            const shouldHide = filterMode === "active" && row.dataset.cityStatus !== "active";
+            row.classList.toggle("hidden-row", shouldHide);
+          });
+
+          showToast("info", filterMode === "all" ? "Filter cleared" : "Active signals only", filterMode === "all" ? "All tracked cities are visible again." : "Showing only cities with active signals.");
+          return;
+        }
+
+        if (currentView === "performance") {
+          refreshSignals();
+          showToast("info", "Curve highlighted", "Performance cards and curve refreshed.");
+          return;
+        }
+
+        if (currentView === "licenses") {
+          showToast("info", "Admin mode", "License generation is available.");
+        }
+      }
+
+      async function generateLicense() {
+        if (!supabaseClient) {
+          showToast("error", "Supabase not configured", "Paste your Supabase URL and anon key into dashboard.html.");
+          return;
+        }
+
+        if (!isAdmin || !weathrlySessionToken) {
+          showToast("error", "Admin only", "This action requires admin access.");
+          return;
+        }
+
+        generateLicenseBtn.textContent = "Generating...";
+
+        try {
+          const { data, error } = await supabaseClient.functions.invoke("generate-license", {
+            body: {
+              sessionToken: weathrlySessionToken,
+              plan: "Lifetime"
+            }
+          });
+
+          generateLicenseBtn.textContent = "Generate Valid Key";
+
+          if (error || !data || !data.ok || !data.key) {
+            showToast("error", "License failed", "Could not generate a license key.");
+            return;
+          }
+
+          const key = data.key;
+          const row = document.createElement("tr");
+
+          if (licensesBody.textContent.includes("No generated keys yet")) {
+            licensesBody.innerHTML = "";
+          }
+
+          row.innerHTML =
+            '<td><div class="market-title">' + escapeHTML(key) + '</div></td>' +
+            '<td>Lifetime</td>' +
+            '<td><span class="license-status license-valid">Valid</span></td>' +
+            '<td>Just now</td>' +
+            '<td><button class="license-btn copy-license-btn" type="button" data-key="' + escapeHTML(key) + '">Copy</button></td>';
+
+          licensesBody.prepend(row);
+
+          generatedKeyBox.textContent = key;
+          generatedKeyBox.classList.add("show");
+
+          showToast("success", "Lifetime license generated", "New valid license key is ready.");
+        } catch (error) {
+          generateLicenseBtn.textContent = "Generate Valid Key";
+          showToast("error", "License failed", "Could not generate a license key.");
+        }
+      }
+
+      async function copyText(value, successMessage) {
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(value);
+          } else {
+            const textarea = document.createElement("textarea");
+            textarea.value = value;
+            textarea.setAttribute("readonly", "");
+            textarea.style.position = "fixed";
+            textarea.style.opacity = "0";
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand("copy");
+            document.body.removeChild(textarea);
+          }
+
+          showToast("success", "Copied", successMessage);
+          return true;
+        } catch (error) {
+          showToast("error", "Copy failed", "Select and copy manually.");
+          return false;
+        }
+      }
+
+      document.querySelectorAll("button, .back-link").forEach(function (button) {
+        button.addEventListener("click", addRipple);
+      });
+
+      payTabs.forEach(function (tab) {
+        tab.addEventListener("click", function () {
+          renderCoin(tab.dataset.coin, didInitialRender);
+          didInitialRender = true;
+        });
+      });
+
+      copyBtn.addEventListener("click", async function () {
+        const valueToCopy = addressBox.textContent.trim();
+        const copied = await copyText(valueToCopy, "Wallet address copied to clipboard.");
+
+        if (copied) {
+          copyBtn.classList.add("copied");
+          copyBtn.textContent = "Copied";
+
+          window.setTimeout(function () {
+            copyBtn.classList.remove("copied");
+            copyBtn.textContent = "Copy";
+          }, 1400);
+        }
+      });
+
+      accessBtn.addEventListener("click", unlockDashboard);
+
+      licenseKey.addEventListener("keydown", function (event) {
+        if (event.key === "Enter") unlockDashboard();
+      });
+
+      logoutBtn.addEventListener("click", logoutDashboard);
+      refreshBtn.addEventListener("click", refreshSignals);
+      filterBtn.addEventListener("click", toggleFilter);
+      generateLicenseBtn.addEventListener("click", generateLicense);
+
+      document.querySelectorAll(".side-link").forEach(function (link) {
+        link.addEventListener("click", function () {
+          switchView(link.dataset.view);
+        });
+      });
+
+      document.addEventListener("click", function (event) {
+        const copyLicenseButton = event.target.closest(".copy-license-btn");
+
+        if (copyLicenseButton) {
+          copyText(copyLicenseButton.dataset.key, "License key copied to clipboard.");
+        }
+      });
+
+      window.addEventListener("mousemove", function (event) {
+        if (!cursorLight) return;
+
+        cursorLight.style.opacity = "1";
+        cursorLight.style.left = event.clientX + "px";
+        cursorLight.style.top = event.clientY + "px";
+      });
+
+      window.addEventListener("mouseleave", function () {
+        if (cursorLight) cursorLight.style.opacity = "0";
+      });
+
+      renderCoin("btc", false);
+      loadPrices();
+      countRows();
+
+      console.assert(document.querySelector('[data-view="licenses"]'), "Expected admin Licenses navigation item.");
+      console.assert(!document.body.textContent.includes("Export CSV"), "Export CSV button should be removed.");
+      console.assert(!document.body.textContent.includes("Add City"), "Add City button should be removed.");
+      console.assert(document.getElementById("view-cities"), "Expected Tracked Cities view.");
+      console.assert(document.getElementById("view-performance"), "Expected Performance view.");
+      console.assert(document.getElementById("generateLicenseBtn"), "Expected license generator button.");
+    })();
+  </script>
+</body>
+</html>
